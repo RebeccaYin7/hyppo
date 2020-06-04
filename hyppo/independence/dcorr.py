@@ -129,7 +129,7 @@ class Dcorr(IndependenceTest):
 
         return stat
 
-    def test(self, x, y, reps=1000, workers=1, auto=True, bias=False):
+    def test(self, x, y, reps=1000, workers=1, auto=True, bias=False, c_mat=False):
         r"""
         Calculates the Dcorr test statistic and p-value.
 
