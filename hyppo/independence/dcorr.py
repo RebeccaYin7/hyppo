@@ -219,7 +219,10 @@ class Dcorr(IndependenceTest):
                 x = self.compute_distance(x, workers=workers)
                 y = self.compute_distance(y, workers=workers)
                 self.is_distance = True
-            stat, pvalue = super(Dcorr, self).test(x, y, reps, workers)
+            else:
+                x = _center_distmat(x, self.bias)
+                y = _center_distmat(y, self.bias)
+            stat, pvalue = super().test(x, y, reps, workers)
 
         if c_mat:
             return stat, pvalue, x * y
