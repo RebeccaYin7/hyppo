@@ -152,6 +152,10 @@ class Dcorr(IndependenceTest):
             is greater than 20. If True, and sample size is greater than 20, a fast
             chi2 approximation will be run. Parameters ``reps`` and ``workers`` are
             irrelevant in this case.
+        c_mat : bool (default: False)
+            If True, also returns the element-wise product of the centered `x` and
+            `y` data matrices. The normalized sum of this matrix is the test
+            statistic. Sets auto to False if True.
 
         Returns
         -------
@@ -159,6 +163,9 @@ class Dcorr(IndependenceTest):
             The computed Dcorr statistic.
         pvalue : float
             The computed Dcorr p-value.
+        c_mat : ndarray
+            The element-wise product of the centered data matrices. Only returned
+            if `c_mat=True`.
 
         Examples
         --------
@@ -202,7 +209,7 @@ class Dcorr(IndependenceTest):
         if self.is_distance:
             check_xy_distmat(x, y)
 
-        if auto and x.shape[0] > 20:
+        if auto and x.shape[0] > 20 and not c_mat:
             stat, pvalue = chi2_approx(self._statistic, x, y)
             self.stat = stat
             self.pvalue = pvalue
@@ -214,7 +221,10 @@ class Dcorr(IndependenceTest):
                 self.is_distance = True
             stat, pvalue = super(Dcorr, self).test(x, y, reps, workers)
 
-        return stat, pvalue
+        if c_mat:
+            return stat, pvalue, x * y
+        else:
+            return stat, pvalue
 
 
 @njit
