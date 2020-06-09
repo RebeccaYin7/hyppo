@@ -4,7 +4,7 @@ from .._utils import (
     check_ndarray_xy,
     convert_xy_float64,
     check_reps,
-    euclidean,
+    compute_dist,
 )
 
 
@@ -59,8 +59,7 @@ class _CheckInputs:
             else:
                 x1 = x1[np.ix_(idx, idx)]
 
-        if not self.is_distance:
-            x1 = euclidean(x1)
+        x1 = compute_dist(x1)
 
         return x1
 

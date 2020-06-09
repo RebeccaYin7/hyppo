@@ -1,7 +1,7 @@
 import numpy as np
 from numba import njit
 
-from .._utils import euclidean, check_xy_distmat
+from .._utils import compute_dist
 from .base import IndependenceTest
 from ._utils import _CheckInputs
 
@@ -18,11 +18,11 @@ class HHG(IndependenceTest):
 
     Parameters
     ----------
-    compute_distance : callable(), optional (default: euclidean)
+    metric : callable(), optional (default: euclidean)
         A function that computes the distance among the samples within each
         data matrix. Set to `None` if `x` and `y` are already distance
         matrices. To call a custom function, either create the distance matrix
-        before-hand or create a function of the form ``compute_distance(x)``
+        before-hand or create a function of the form ``metric(x)``
         where `x` is the data matrix for which pairwise distances are
         calculated.
 
@@ -84,12 +84,8 @@ class HHG(IndependenceTest):
                *Biometrika*, 100(2), 503-510.
     """
 
-    def __init__(self, compute_distance=euclidean):
-        self.is_distance = False
-        if not compute_distance:
-            self.is_distance = True
-
-        IndependenceTest.__init__(self, compute_distance=compute_distance)
+    def __init__(self, metric="euclidean", **kwargs):
+        IndependenceTest.__init__(self, metric=metric, **kwargs)
 
     def _statistic(self, x, y):
         r"""
@@ -109,15 +105,8 @@ class HHG(IndependenceTest):
         stat : float
             The computed HHG statistic.
         """
-        distx = x
-        disty = y
-
-        if not self.is_distance:
-            distx = self.compute_distance(x)
-            disty = self.compute_distance(y)
-
+        distx, disty = compute_dist(x, y, metric=self.metric, **self.kwargs)
         stat = _hhg(distx, disty)
-
         self.stat = stat
 
         return stat
@@ -170,29 +159,24 @@ class HHG(IndependenceTest):
         '160.0, 0.00'
 
         In addition, the inputs can be distance matrices. Using this is the,
-        same as before, except the ``compute_distance`` parameter must be set
+        same as before, except the ``metric`` parameter must be set
         to ``None``.
 
         >>> import numpy as np
         >>> from hyppo.independence import HHG
         >>> x = np.ones((10, 10)) - np.identity(10)
         >>> y = 2 * x
-        >>> hhg = HHG(compute_distance=None)
+        >>> hhg = HHG(metric=None)
         >>> stat, pvalue = hhg.test(x, y)
         >>> '%.1f, %.2f' % (stat, pvalue)
         '0.0, 1.00'
         """
         check_input = _CheckInputs(
-            x, y, reps=reps, compute_distance=self.compute_distance
+            x, y, reps=reps, metric=self.metric
         )
         x, y = check_input()
 
-        if self.is_distance:
-            check_xy_distmat(x, y)
-        else:
-            x = self.compute_distance(x, workers=workers)
-            y = self.compute_distance(y, workers=workers)
-            self.is_distance = True
+        x, y = compute_dist(x, y, metric=self.metric, workers=workers, **self.kwargs)
 
         return super(HHG, self).test(x, y, reps, workers)
 

@@ -1,7 +1,7 @@
 import warnings
 from scipy.stats import multiscale_graphcorr
 
-from .._utils import euclidean, check_xy_distmat
+from .._utils import compute_dist
 from .base import IndependenceTest
 from ._utils import _CheckInputs
 
@@ -29,11 +29,11 @@ class MGC(IndependenceTest):
 
     Parameters
     ----------
-    compute_distance : callable(), optional (default: euclidean)
+    metric : callable(), optional (default: euclidean)
         A function that computes the distance among the samples within each
         data matrix. Set to `None` if `x` and `y` are already distance
         matrices. To call a custom function, either create the distance matrix
-        before-hand or create a function of the form ``compute_distance(x)``
+        before-hand or create a function of the form ``metric(x)``
         where `x` is the data matrix for which pairwise distances are
         calculated.
 
@@ -107,13 +107,8 @@ class MGC(IndependenceTest):
                Statistical Association.
     """
 
-    def __init__(self, compute_distance=euclidean):
-        # set is_distance to true if compute_distance is None
-        self.is_distance = False
-        if not compute_distance:
-            self.is_distance = True
-
-        IndependenceTest.__init__(self, compute_distance=compute_distance)
+    def __init__(self, metric="euclidean", **kwargs):
+        IndependenceTest.__init__(self, metric=metric, **kwargs)
 
     def _statistic(self, x, y):
         r"""
@@ -133,10 +128,11 @@ class MGC(IndependenceTest):
         stat : float
             The computed MGC statistic.
         """
+        distx, disty = compute_dist(x, y, metric=self.metric, **self.kwargs)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore")
             mgc = multiscale_graphcorr(
-                x, y, compute_distance=self.compute_distance, reps=0
+                distx, disty, metric=self.metric, reps=0
             )
         stat = mgc.stat
         self.stat = stat
@@ -198,39 +194,37 @@ class MGC(IndependenceTest):
         '1.0, 0.000'
 
         In addition, the inputs can be distance matrices. Using this is the,
-        same as before, except the ``compute_distance`` parameter must be set
+        same as before, except the ``metric`` parameter must be set
         to ``None``.
 
         >>> import numpy as np
         >>> from hyppo.independence import MGC
         >>> x = np.ones((10, 10)) - np.identity(10)
         >>> y = 2 * x
-        >>> mgc = MGC(compute_distance=None)
+        >>> mgc = MGC(metric=None)
         >>> stat, pvalue, _ = mgc.test(x, y)
         >>> '%.1f, %.2f' % (stat, pvalue)
         '0.0, 1.00'
         """
         check_input = _CheckInputs(
-            x, y, reps=reps, compute_distance=self.compute_distance
+            x, y, reps=reps, metric=self.metric
         )
         x, y = check_input()
 
-        if self.is_distance:
-            check_xy_distmat(x, y)
-
         # using our joblib implementation instead of multiprocessing backend in
         # scipy gives significantly faster results
+        x, y = compute_dist(x, y, metric=self.metric, **self.kwargs)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore")
             _, _, mgc_dict = multiscale_graphcorr(
-                x, y, compute_distance=self.compute_distance, reps=0
+                x, y, metric=self.metric, reps=0
             )
         mgc_dict.pop("null_dist")
 
         # add this after MGC source code fix
         # if not self.is_distance:
-        #     x = self.compute_distance(x, workers=workers)
-        #     y = self.compute_distance(y, workers=workers)
+        #     x = self.metric(x, workers=workers)
+        #     y = self.metric(y, workers=workers)
 
         # change is_distsim to True after scipy fix
         stat, pvalue = super(MGC, self).test(x, y, reps, workers, is_distsim=False)

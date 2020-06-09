@@ -4,7 +4,7 @@ from joblib import Parallel, delayed
 import numpy as np
 from scipy.stats.distributions import chi2
 from sklearn.metrics import pairwise_distances
-from sklearn.metrics.pairwise import rbf_kernel
+from sklearn.metrics.pairwise import pairwise_kernels
 
 
 # from scipy
@@ -67,7 +67,7 @@ def check_reps(reps):
         warnings.warn(msg, RuntimeWarning)
 
 
-def check_compute_distance(compute):
+def check_metric(compute):
     """Check if compute distance/kernel function if a callable()"""
     if not callable(compute) and compute is not None:
         raise ValueError("The compute distance/kernel must be a function.")
@@ -95,22 +95,33 @@ def check_inputs_distmat(inputs):
             )
 
 
-def euclidean(x, workers=None):
-    """Default euclidean distance function calculation"""
-    return pairwise_distances(X=x, metric="euclidean", n_jobs=workers)
+def compute_kern(x, y, metric="rbf", workers=None, **kwargs):
+    if metric == "rbf" and "gamma" not in kwargs:
+        l1 = pairwise_distances(x, metric="l1", n_jobs=workers)
+        n = l1.shape[0]
+        med = np.median(
+            np.lib.stride_tricks.as_strided(
+                l1, (n - 1, n + 1), (l1.itemsize * (n + 1), l1.itemsize)
+            )[:, 1:]
+        )
+        kwargs["gamma"] = 1.0 / (2 * (med ** 2))
+    if callable(metric):
+        simx = metric(x, **kwargs)
+        simy = metric(y, **kwargs)
+    else:
+        simx = pairwise_kernels(x, metric=metric, n_jobs=workers, **kwargs)
+        simy = pairwise_kernels(y, metric=metric, n_jobs=workers, **kwargs)
+    return simx, simy
 
 
-def gaussian(x, workers=None):
-    """Default medial gaussian kernel similarity calculation"""
-    l1 = pairwise_distances(X=x, metric="l1", n_jobs=workers)
-    n = l1.shape[0]
-    med = np.median(
-        np.lib.stride_tricks.as_strided(
-            l1, (n - 1, n + 1), (l1.itemsize * (n + 1), l1.itemsize)
-        )[:, 1:]
-    )
-    gamma = 1.0 / (2 * (med ** 2))
-    return rbf_kernel(x, gamma=gamma)
+def compute_dist(x, y, metric="euclidean", workers=None, **kwargs):
+    if callable(metric):
+        distx = metric(x, **kwargs)
+        disty = metric(y, **kwargs)
+    else:
+        distx = pairwise_distances(x, metric=metric, n_jobs=workers, **kwargs)
+        disty = pairwise_distances(y, metric=metric, n_jobs=workers, **kwargs)
+    return distx, disty
 
 
 # p-value computation

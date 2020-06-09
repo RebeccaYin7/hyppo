@@ -3,7 +3,7 @@ import numpy as np
 from .base import IndependenceTest
 from ._utils import _CheckInputs
 from . import Dcorr
-from .._utils import gaussian, check_xy_distmat, chi2_approx
+from .._utils import chi2_approx, compute_kern
 
 
 class Hsic(IndependenceTest):
@@ -18,11 +18,11 @@ class Hsic(IndependenceTest):
 
     Parameters
     ----------
-    compute_kernel : callable(), optional (default: rbf kernel)
+    metric : callable(), optional (default: rbf kernel)
         A function that computes the similarity among the samples within each
         data matrix. Set to `None` if `x` and `y` are already similarity
         matrices. To call a custom function, either create the distance matrix
-        before-hand or create a function of the form ``compute_kernel(x)``
+        before-hand or create a function of the form ``metric(x)``
         where `x` is the data matrix for which pairwise similarties are
         calculated.
     bias : bool (default: False)
@@ -93,16 +93,9 @@ class Hsic(IndependenceTest):
                 11(Apr), 1391-1423.
     """
 
-    def __init__(self, compute_kernel=gaussian, bias=False):
-        # set statistic and p-value
-        self.compute_kernel = compute_kernel
-
-        self.is_kernel = False
-        if not compute_kernel:
-            self.is_kernel = True
+    def __init__(self, bias=False, metric="rbf", **kwargs):
         self.bias = bias
-
-        IndependenceTest.__init__(self, compute_distance=compute_kernel)
+        IndependenceTest.__init__(self, metric=metric, **kwargs)
 
     def _statistic(self, x, y):
         r"""
@@ -122,16 +115,10 @@ class Hsic(IndependenceTest):
         stat : float
             The computed Hsic statistic.
         """
-        distx = x
-        disty = y
+        kernx, kerny = compute_kern(x, y, metric=self.metric, **self.kwargs)
+        distx, disty = ee_transform(kernx, kerny)
 
-        if not self.is_kernel:
-            kernx = self.compute_kernel(x)
-            kerny = self.compute_kernel(y)
-            distx = 1 - kernx / np.max(kernx)
-            disty = 1 - kerny / np.max(kerny)
-
-        dcorr = Dcorr(compute_distance=None, bias=self.bias)
+        dcorr = Dcorr(metric=None, bias=self.bias)
         stat = dcorr._statistic(distx, disty)
         self.stat = stat
 
@@ -190,25 +177,22 @@ class Hsic(IndependenceTest):
         '1.0, 0.00'
 
         In addition, the inputs can be distance matrices. Using this is the,
-        same as before, except the ``compute_kernel`` parameter must be set
+        same as before, except the ``metric`` parameter must be set
         to ``None``.
 
         >>> import numpy as np
         >>> from hyppo.independence import Hsic
         >>> x = np.ones((10, 10)) - np.identity(10)
         >>> y = 2 * x
-        >>> hsic = Hsic(compute_kernel=None)
+        >>> hsic = Hsic(metric=None)
         >>> stat, pvalue = hsic.test(x, y)
         >>> '%.1f, %.2f' % (stat, pvalue)
         '0.0, 1.00'
         """
         check_input = _CheckInputs(
-            x, y, reps=reps, compute_distance=self.compute_kernel
+            x, y, reps=reps, metric=self.metric
         )
         x, y = check_input()
-
-        if self.is_kernel:
-            check_xy_distmat(x, y)
 
         if auto and x.shape[0] > 20:
             stat, pvalue = chi2_approx(self._statistic, x, y)
@@ -216,10 +200,14 @@ class Hsic(IndependenceTest):
             self.pvalue = pvalue
             self.null_dist = None
         else:
-            if not self.is_kernel:
-                x = self.compute_kernel(x, workers=workers)
-                y = self.compute_kernel(y, workers=workers)
-                self.is_kernel = True
+            x, y = compute_kern(x, y, metric=self.metric, workers=workers, **self.kwargs)
             stat, pvalue = super(Hsic, self).test(x, y, reps, workers)
 
         return stat, pvalue
+
+
+def ee_transform(kernx, kerny):
+    """Exact equivalence transformation."""
+    distx = 1 - kernx / np.max(kernx)
+    disty = 1 - kerny / np.max(kerny)
+    return distx, disty

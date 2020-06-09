@@ -52,10 +52,10 @@ class TestHsicErrorWarn:
         assert_raises(ValueError, Hsic().test, x, y)
 
     def test_error_wrongdisttype(self):
-        # raises error if compute_distance is not a function
+        # raises error if metric is not a function
         x = np.arange(20)
-        compute_kernel = 1
-        hsic = Hsic(compute_kernel=compute_kernel)
+        metric = 1
+        hsic = Hsic(metric=metric)
         assert_raises(ValueError, hsic.test, x, x)
 
     @pytest.mark.parametrize(

@@ -1,7 +1,16 @@
-from .._utils import euclidean, gaussian
 from .base import KSampleTest
 from ..independence import CCA, Dcorr, HHG, RV, Hsic, MGC
 from ._utils import _CheckInputs, k_sample_transform
+
+
+TEST_NAMES = {
+    "rv": RV,
+    "cca": CCA,
+    "hhg": HHG,
+    "hsic": Hsic,
+    "dcorr": Dcorr,
+    "mgc": MGC,
+}
 
 
 class KSample(KSampleTest):
@@ -19,11 +28,11 @@ class KSample(KSampleTest):
     indep_test : {"CCA", "Dcorr", "HHG", "RV", "Hsic", "MGC"}
         A string corresponding to the desired independence test from
         ``mgc.independence``. This is not case sensitive.
-    compute_distance : callable(), optional (default: euclidean)
+    metric : callable(), optional (default: euclidean)
         A function that computes the distance among the samples within each
         data matrix. Set to `None` if `x` and `y` are already distance
         matrices. To call a custom function, either create the distance matrix
-        before-hand or create a function of the form ``compute_distance(x)``
+        before-hand or create a function of the form ``metric(x)``
         where `x` is the data matrix for which pairwise distances are
         calculated.
     bias : bool (default: False)
@@ -62,36 +71,33 @@ class KSample(KSampleTest):
     this data.
     """
 
-    def __init__(self, indep_test, compute_distance=euclidean, bias=False):
+    def __init__(self, indep_test, metric="euclidean", bias=False):
         indep_test = indep_test.lower()
-        test_names = {
-            "rv": RV,
-            "cca": CCA,
-            "hhg": HHG,
-            "hsic": Hsic,
-            "dcorr": Dcorr,
-            "mgc": MGC,
-        }
-        if indep_test not in test_names.keys():
+        if indep_test not in TEST_NAMES.keys():
             raise ValueError("Test is not a valid independence test")
-        if indep_test == "hsic" and compute_distance == euclidean:
-            compute_distance = gaussian
+        if indep_test == "hsic" and metric == "euclidean":
+            metric = "rbf"
         self.indep_test_name = indep_test
-        indep_test = test_names[indep_test]
+        indep_test = TEST_NAMES[indep_test]
 
-        if self.indep_test_name in ["dcorr", "hhg", "hsic", "mgc"]:
-            if self.indep_test_name == "hsic":
-                self.indep_test = indep_test(compute_kernel=compute_distance, bias=bias)
-            elif self.indep_test_name == "dcorr":
-                self.indep_test = indep_test(
-                    compute_distance=compute_distance, bias=bias
-                )
-            else:
-                self.indep_test = indep_test(compute_distance=compute_distance)
-        else:
-            self.indep_test = indep_test()
+        kwargs = {
+            "metric": metric,
+            "bias": bias
+        }
+        self.indep_test = indep_test(**kwargs)
+        # if self.indep_test_name in ["dcorr", "hhg", "hsic", "mgc"]:
+        #     if self.indep_test_name == "hsic":
+        #         self.indep_test = indep_test(metric=metric, bias=bias)
+        #     elif self.indep_test_name == "dcorr":
+        #         self.indep_test = indep_test(
+        #             metric=metric, bias=bias
+        #         )
+        #     else:
+        #         self.indep_test = indep_test(metric=metric)
+        # else:
+        #     self.indep_test = indep_test()
 
-        KSampleTest.__init__(self, compute_distance=compute_distance)
+        KSampleTest.__init__(self, metric=metric)
 
     def _statistic(self, *args):
         r"""
@@ -119,7 +125,7 @@ class KSample(KSampleTest):
         ----------
         *args : ndarrays
             Variable length input data matrices. All inputs must have the same
-            number of samples. That is, the shapes must be `(n, p)` and
+            number of dimensions. That is, the shapes must be `(n, p)` and
             `(m, p)` where `n` and `m` are the number of samples and `p` are
             the number of dimensions. Alternatively, inputs can be distance
             matrices, where the shapes must all be `(n, n)`.
@@ -153,11 +159,10 @@ class KSample(KSampleTest):
         >>> '%.3f, %.1f' % (stat, pvalue)
         '-0.136, 1.0'
         """
-        inputs = list(args)
         check_input = _CheckInputs(
-            inputs=inputs,
+            inputs=args,
             indep_test=self.indep_test,
-            compute_distance=self.compute_distance,
+            metric=self.metric,
         )
         inputs = check_input()
         u, v = k_sample_transform(inputs)

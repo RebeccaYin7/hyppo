@@ -7,17 +7,17 @@ from .._utils import (
     check_ndarray_xy,
     convert_xy_float64,
     check_reps,
-    check_compute_distance,
+    check_metric,
 )
 from ..independence import MGC
 
 
 class _CheckInputs:
-    def __init__(self, x, y, max_lag=None, reps=None, compute_distance=None):
+    def __init__(self, x, y, max_lag=None, reps=None, metric=None):
         self.x = x
         self.y = y
         self.max_lag = max_lag
-        self.compute_distance = compute_distance
+        self.metric = metric
         self.reps = reps
 
     def __call__(self):
@@ -29,7 +29,7 @@ class _CheckInputs:
         self.x, self.y = convert_xy_float64(self.x, self.y)
         self._check_min_samples()
         # self._check_variance()
-        check_compute_distance(self.compute_distance)
+        check_metric(self.metric)
 
         if self.reps:
             check_reps(self.reps)
@@ -84,15 +84,15 @@ class _CheckInputs:
     #             raise ValueError("Test cannot be run, one of the inputs has 0 variance")
 
 
-def compute_stat(x, y, indep_test, compute_distance, max_lag):
+def compute_stat(x, y, indep_test, metric, max_lag):
     """Compute time series test statistic"""
     # calculate distance matrices
-    distx = compute_distance(x)
-    disty = compute_distance(y)
+    distx = metric(x)
+    disty = metric(y)
 
     # calculate dep_lag when max_lag is 0
     dep_lag = []
-    indep_test = indep_test(compute_distance=compute_distance)
+    indep_test = indep_test(metric=metric)
     indep_test_stat = indep_test._statistic(x, y)
     dep_lag.append(np.maximum(0, indep_test_stat))
 
@@ -111,11 +111,11 @@ def compute_stat(x, y, indep_test, compute_distance, max_lag):
     return stat, opt_lag
 
 
-def compute_scale_at_lag(x, y, opt_lag, compute_distance):
+def compute_scale_at_lag(x, y, opt_lag, metric):
     """Run the mgc test at the optimal scale (by shifting the series)."""
     n = x.shape[0]
-    distx = compute_distance(x)
-    disty = compute_distance(y)
+    distx = metric(x)
+    disty = metric(y)
 
     slice_distx = distx[opt_lag:n, opt_lag:n]
     slice_disty = disty[0 : (n - opt_lag), 0 : (n - opt_lag)]

@@ -46,7 +46,7 @@ class DiscrimOneSample(DiscriminabilityTest):
     """
 
     def __init__(self, is_dist=False, remove_isolates=True):
-        # set is_distance to true if compute_distance is None
+        # set is_distance to true if metric is None
         self.is_distance = is_dist
         self.remove_isolates = remove_isolates
         DiscriminabilityTest.__init__(self)

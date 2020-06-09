@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from .._utils import euclidean, perm_test
+from .._utils import perm_test
 
 
 class IndependenceTest(ABC):
@@ -9,20 +9,21 @@ class IndependenceTest(ABC):
 
     Parameters
     ----------
-    compute_distance : callable(), optional (default: euclidean)
+    metric : callable(), optional (default: euclidean)
         A function that computes the distance or similarity among the samples
         within each data matrix. Set to `None` if `x` and `y` are already
         distance matrices. To call a custom function, either create the
         distance matrix before-hand or create a function of the form
-        ``compute_distance(x)`` where `x` is the data matrix for which
+        ``metric(x)`` where `x` is the data matrix for which
         pairwise distances are calculated.
     """
 
-    def __init__(self, compute_distance=euclidean):
+    def __init__(self, metric=None, **kwargs):
         # set statistic and p-value
         self.stat = None
         self.pvalue = None
-        self.compute_distance = compute_distance
+        self.metric = metric
+        self.kwargs = kwargs
 
         super().__init__()
 
@@ -51,6 +52,8 @@ class IndependenceTest(ABC):
         workers : int, optional (default: 1)
             Evaluates method using `multiprocessing.Pool <multiprocessing>`).
             Supply `-1` to use all cores available to the Process.
+        is_distsim : bool, optional (default: True)
+            Whether the inputs are intially distance matrices or not.
 
         Returns
         -------

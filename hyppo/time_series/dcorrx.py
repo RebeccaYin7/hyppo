@@ -13,11 +13,11 @@ class DcorrX(TimeSeriesTest):
 
     Parameters
     ----------
-    compute_distance : callable(), optional (default: euclidean)
+    metric : callable(), optional (default: euclidean)
         A function that computes the distance among the samples within each
         data matrix. Set to `None` if `x` and `y` are already distance
         matrices. To call a custom function, either create the distance matrix
-        before-hand or create a function of the form ``compute_distance(x)``
+        before-hand or create a function of the form ``metric(x)``
         where `x` is the data matrix for which pairwise distances are
         calculated.
 
@@ -53,8 +53,8 @@ class DcorrX(TimeSeriesTest):
                 *ArXiv*
     """
 
-    def __init__(self, compute_distance=None, max_lag=0):
-        TimeSeriesTest.__init__(self, compute_distance=compute_distance)
+    def __init__(self, metric=None, max_lag=0):
+        TimeSeriesTest.__init__(self, metric=metric)
         self.max_lag = max_lag
 
     def _statistic(self, x, y):
@@ -78,11 +78,11 @@ class DcorrX(TimeSeriesTest):
             The computed optimal lag.
         """
         check_input = _CheckInputs(
-            x, y, max_lag=self.max_lag, compute_distance=self.compute_distance
+            x, y, max_lag=self.max_lag, metric=self.metric
         )
         x, y = check_input()
 
-        stat, opt_lag = compute_stat(x, y, Dcorr, self.compute_distance, self.max_lag)
+        stat, opt_lag = compute_stat(x, y, Dcorr, self.metric, self.max_lag)
         self.stat = stat
         self.opt_lag = opt_lag
 
@@ -147,7 +147,7 @@ class DcorrX(TimeSeriesTest):
         '1.1, 0.01, 1'
 
         In addition, the inputs can be distance matrices. Using this is the,
-        same as before, except the ``compute_distance`` parameter must be set
+        same as before, except the ``metric`` parameter must be set
         to ``None``.
 
         >>> import numpy as np
@@ -155,13 +155,13 @@ class DcorrX(TimeSeriesTest):
         >>> np.random.seed(789)
         >>> x = np.ones((10, 10)) - np.identity(10)
         >>> y = 2 * x
-        >>> dcorrx = DcorrX(compute_distance=None)
+        >>> dcorrx = DcorrX(metric=None)
         >>> stat, pvalue, dcorrx_dict = dcorrx.test(x, y)
         >>> '%.1f, %.2f' % (stat, pvalue)
         '1.0, 0.00'
         """
         check_input = _CheckInputs(
-            x, y, max_lag=self.max_lag, compute_distance=self.compute_distance
+            x, y, max_lag=self.max_lag, metric=self.metric
         )
         x, y = check_input()
 

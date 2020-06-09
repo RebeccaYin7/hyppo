@@ -1,7 +1,7 @@
 import numpy as np
 from numba import njit
 
-from .._utils import euclidean, check_xy_distmat, chi2_approx
+from .._utils import chi2_approx, compute_dist
 from .base import IndependenceTest
 from ._utils import _CheckInputs
 
@@ -16,13 +16,25 @@ class Dcorr(IndependenceTest):
 
     Parameters
     ----------
-    compute_distance : callable(), optional (default: euclidean)
+    metric : string or callable(), optional (default: "euclidean")
         A function that computes the distance among the samples within each
-        data matrix. Set to `None` if `x` and `y` are already distance
+        data matrix.
+        Valid strings for ``metric`` are, as defined in
+        ``sklearn.metrics.pairwise_distances``,
+
+            - From scikit-learn: [‘cityblock’, ‘cosine’, ‘euclidean’, ‘l1’, ‘l2’,
+              ‘manhattan’] See .
+            - From scipy.spatial.distance: [‘braycurtis’, ‘canberra’, ‘chebyshev’,
+              ‘correlation’, ‘dice’, ‘hamming’, ‘jaccard’, ‘kulsinski’, ‘mahalanobis’,
+              ‘minkowski’, ‘rogerstanimoto’, ‘russellrao’, ‘seuclidean’,
+              ‘sokalmichener’, ‘sokalsneath’, ‘sqeuclidean’, ‘yule’] See the
+              documentation for scipy.spatial.distance for details on these metrics.
+
+        Set to `None` if `x` and `y` are already distance
         matrices. To call a custom function, either create the distance matrix
-        before-hand or create a function of the form ``compute_distance(x)``
+        before-hand or create a function of the form ``metric(x, **kwargs)``
         where `x` is the data matrix for which pairwise distances are
-        calculated.
+        calculated and kwargs are extra arguements to send to your custom function.
     bias : bool (default: False)
         Whether or not to use the biased or unbiased test statistics.
 
@@ -90,14 +102,9 @@ class Dcorr(IndependenceTest):
                 Statistics*, 42(6), 2382-2412.
     """
 
-    def __init__(self, compute_distance=euclidean, bias=False):
-        # set is_distance to true if compute_distance is None
-        self.is_distance = False
-        if not compute_distance:
-            self.is_distance = True
+    def __init__(self, bias=False, metric="euclidean", **kwargs):
         self.bias = bias
-
-        IndependenceTest.__init__(self, compute_distance=compute_distance)
+        IndependenceTest.__init__(self, metric, **kwargs)
 
     def _statistic(self, x, y):
         r"""
@@ -117,12 +124,7 @@ class Dcorr(IndependenceTest):
         stat : float
             The computed Dcorr statistic.
         """
-        distx = x
-        disty = y
-
-        if not self.is_distance:
-            distx = self.compute_distance(x)
-            disty = self.compute_distance(y)
+        distx, disty = compute_dist(x, y, metric=self.metric, **self.kwargs)
 
         stat = _dcorr(distx, disty, self.bias)
         self.stat = stat
@@ -182,25 +184,22 @@ class Dcorr(IndependenceTest):
         '1.0, 0.00'
 
         In addition, the inputs can be distance matrices. Using this is the,
-        same as before, except the ``compute_distance`` parameter must be set
+        same as before, except the ``metric`` parameter must be set
         to ``None``.
 
         >>> import numpy as np
         >>> from hyppo.independence import Dcorr
         >>> x = np.ones((10, 10)) - np.identity(10)
         >>> y = 2 * x
-        >>> dcorr = Dcorr(compute_distance=None)
+        >>> dcorr = Dcorr(metric=None)
         >>> stat, pvalue = dcorr.test(x, y)
         >>> '%.1f, %.2f' % (stat, pvalue)
         '0.0, 1.00'
         """
         check_input = _CheckInputs(
-            x, y, reps=reps, compute_distance=self.compute_distance
+            x, y, reps=reps, metric=self.metric
         )
         x, y = check_input()
-
-        if self.is_distance:
-            check_xy_distmat(x, y)
 
         if auto and x.shape[0] > 20:
             stat, pvalue = chi2_approx(self._statistic, x, y)
@@ -208,10 +207,7 @@ class Dcorr(IndependenceTest):
             self.pvalue = pvalue
             self.null_dist = None
         else:
-            if not self.is_distance:
-                x = self.compute_distance(x, workers=workers)
-                y = self.compute_distance(y, workers=workers)
-                self.is_distance = True
+            x, y = compute_dist(x, y, metric=self.metric, workers=workers, **self.kwargs)
             stat, pvalue = super(Dcorr, self).test(x, y, reps, workers)
 
         return stat, pvalue
@@ -244,16 +240,16 @@ def _center_distmat(distx, bias):  # pragma: no cover
 
 
 @njit
-def _dcorr(distx, disty, bias):  # pragma: no cover
+def _dcorr(distx, disty, bias):
     """Calculate the Dcorr test statistic"""
     # center distance matrices
     cent_distx = _center_distmat(distx, bias)
     cent_disty = _center_distmat(disty, bias)
 
     # calculate covariances and variances
-    covar = np.sum(np.multiply(cent_distx, cent_disty.T))
-    varx = np.sum(np.multiply(cent_distx, cent_distx.T))
-    vary = np.sum(np.multiply(cent_disty, cent_disty.T))
+    covar = np.sum(cent_distx * cent_disty.T)
+    varx = np.sum(cent_distx * cent_distx.T)
+    vary = np.sum(cent_disty * cent_disty.T)
 
     # stat is 0 with negative variances (would make denominator undefined)
     if varx <= 0 or vary <= 0:

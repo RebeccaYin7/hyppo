@@ -3,8 +3,6 @@ from abc import ABC, abstractmethod
 import numpy as np
 from joblib import Parallel, delayed
 
-from .._utils import euclidean
-
 
 class TimeSeriesTest(ABC):
     """
@@ -12,7 +10,7 @@ class TimeSeriesTest(ABC):
 
     Parameters
     ----------
-    compute_distance : callable, optional
+    metric : callable, optional
         Function indicating distance metric (or alternatively the kernel) to
         use. Calculates the pairwise distance for each input, by default
         euclidean.
@@ -23,22 +21,22 @@ class TimeSeriesTest(ABC):
         The computed independence test statistic.
     pvalue : float
         The computed independence test p-value.
-    compute_distance : callable, optional
+    metric : callable, optional
         Function indicating distance metric (or alternatively the kernel) to
         use. Calculates the pairwise distance for each input, by default
         euclidean.
     """
 
-    def __init__(self, compute_distance=None, max_lag=0):
+    def __init__(self, metric=None, max_lag=0):
         # set statistic and p-value
         self.stat = None
         self.pvalue = None
         self.max_lag = max_lag
 
-        # set compute_distance kernel
-        if not compute_distance:
-            compute_distance = euclidean
-        self.compute_distance = compute_distance
+        # set metric kernel
+        if not metric:
+            metric = euclidean
+        self.metric = metric
 
         super().__init__()
 
@@ -81,8 +79,8 @@ class TimeSeriesTest(ABC):
         null_dist : list
             The null distribution of the permuted test statistics.
         """
-        self.distx = self.compute_distance(x)
-        self.disty = self.compute_distance(y)
+        self.distx = self.metric(x)
+        self.disty = self.metric(y)
 
         # calculate observed test statistic
         stat_list = self._statistic(x, y)

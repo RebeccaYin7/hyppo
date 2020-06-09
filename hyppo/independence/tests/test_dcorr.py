@@ -52,10 +52,10 @@ class TestDcorrErrorWarn:
         assert_raises(ValueError, Dcorr().test, x, y)
 
     def test_error_wrongdisttype(self):
-        # raises error if compute_distance is not a function
+        # raises error if metric is not a function
         x = np.arange(20)
-        compute_distance = 1
-        dcorr = Dcorr(compute_distance=compute_distance)
+        metric = 1
+        dcorr = Dcorr(metric=metric)
         assert_raises(ValueError, dcorr.test, x, x)
 
     @pytest.mark.parametrize(

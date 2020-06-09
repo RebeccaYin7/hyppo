@@ -53,10 +53,10 @@ class TestHHGErrorWarn:
         assert_raises(ValueError, HHG().test, x, y)
 
     def test_error_wrongdisttype(self):
-        # raises error if compute_distance is not a function
+        # raises error if metric is not a function
         x = np.arange(20)
-        compute_distance = 1
-        hhg = HHG(compute_distance=compute_distance)
+        metric = 1
+        hhg = HHG(metric=metric)
         assert_raises(ValueError, hhg.test, x, x)
 
     @pytest.mark.parametrize(
